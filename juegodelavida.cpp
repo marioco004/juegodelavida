@@ -125,7 +125,7 @@ int main()
 
 	inicializar_matriz(matrizActual);
 
-	matrizActual[0][0] = false;
+	matrizActual[0][0] = true;
 	matrizActual[0][1] = false;
 	matrizActual[0][2] = false;
 
