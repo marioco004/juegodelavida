@@ -1,118 +1,153 @@
 #include <iostream>
-#include <vector>
-#include <cstdlib>
 #include <ctime>
-#include <windows.h> // Para Sleep()
+#include <cstdlib>
 
 using namespace std;
 
-// 🔹 Constantes globales (UPPER_SNAKE_CASE)
-const int TAMANO_MAX = 50; // Tamaño máximo permitido
+void limpiar_pantalla() { cout << "\033[2J\033[H"; }
+void gotoxy(int x, int y) { cout << "\033[" << y + 1 << ";" << x + 1 << "H"; }
+void esperar(int ms) { for (clock_t t = clock(); (clock() - t) * 1000 / CLOCKS_PER_SEC < ms;); }
 
-// 🔹 Declaración de funciones (snake_case)
-void inicializar_tablero(vector<vector<int>>& tablero, int tamano, bool patron);
-int calcular_vecinos_vivos(const vector<vector<int>>& tablero, int fila, int columna, int tamano);
-void actualizar_tablero(vector<vector<int>>& tablero, int tamano);
-void imprimir_tablero(const vector<vector<int>>& tablero, int tamano);
+const int filas = 20;
+const int columnas = 40;
 
-int main() {
-    int tamano, num_generaciones;
-    bool usar_patron;
-
-    // 🟢 Entrada del usuario
-    cout << "Ingrese tamano del tablero (maximo " << TAMANO_MAX << "): ";
-    cin >> tamano;
-    if (tamano > TAMANO_MAX) tamano = TAMANO_MAX; // Límite de seguridad
-
-    cout << "Ingrese numero de generaciones a simular: ";
-    cin >> num_generaciones;
-
-    cout << "Desea inicializar con un patron predefinido (1 = Sí, 0 = No): ";
-    cin >> usar_patron;
-
-    // 🔹 Creación del tablero
-    vector<vector<int>> tablero(tamano, vector<int>(tamano, 0));
-    inicializar_tablero(tablero, tamano, usar_patron);
-
-    // 🔄 Simulación
-    for (int i = 0; i < num_generaciones; ++i) {
-        imprimir_tablero(tablero, tamano);
-        actualizar_tablero(tablero, tamano);
-        Sleep(200); // Pausa de 200ms para ver el cambio en Windows
-        system("cls"); // Limpiar pantalla
-    }
-
-    return 0;
+void inicializar_matriz(bool matriz[filas][columnas])
+{
+	for (int i = 0; i < filas; i ++)
+	{
+		for (int j = 0; j < columnas; j++)
+		{
+			matriz[i][j] = false;
+		}
+	}
+}
+void imprimir_matriz(bool matriz[filas][columnas])
+{
+	for (int i = 0; i < filas; i++)
+	{
+		for (int j = 0; j < columnas; j++)
+		{
+			gotoxy(j, i);
+			if (matriz[i][j])
+			{
+				cout << "#";
+			}
+			else
+			{
+				cout << " ";
+			}
+		}
+	}
+	cout << flush; 
 }
 
-// 🔹 Función para inicializar el tablero
-void inicializar_tablero(vector<vector<int>>& tablero, int tamano, bool patron) {
-    srand(time(0));
+/**
+ * @brief Cuenta los vecinos vivos de una celda en el tablero.
+ *
+ * @param fila Fila de la celda actual.
+ * @param columna Columna de la celda actual.
+ * @return Número de células vivas adyacentes (0-8).
+ */
+int contar_vecinos(bool matrizActual[filas][columnas], int i, int j)
+{
+	///Almacena la cantidad de vecinos q hay alrededor
+	int contador = 0;
 
-    if (patron) {
-        // 🟢 Patrón Planeador
-        int x = 1, y = 1;
-        tablero[x][y + 1] = 1;
-        tablero[x + 1][y + 2] = 1;
-        tablero[x + 2][y] = 1;
-        tablero[x + 2][y + 1] = 1;
-        tablero[x + 2][y + 2] = 1;
-    }
-    else {
-        // 🔹 Inicialización aleatoria
-        for (int i = 0; i < tamano; ++i) {
-            for (int j = 0; j < tamano; ++j) {
-                tablero[i][j] = rand() % 2;
-            }
-        }
-    }
+	///TOROIDAL
+	const int arriba =(i + (-1) + filas) % filas;
+	const int abajo = (i +1) % filas;
+	const int izquierda = (j + (-1) + columnas) % columnas;
+	const int derecha = (j +1) % columnas;
+
+	//Contar 
+	contador += matrizActual[arriba][izquierda];
+	contador += matrizActual[arriba][j];
+	contador += matrizActual[arriba][derecha];
+
+	contador += matrizActual[i][izquierda];
+	contador += matrizActual[i][derecha];
+
+	contador += matrizActual[abajo][izquierda];
+	contador += matrizActual[abajo][j];
+	contador += matrizActual[abajo][derecha];
+
+	return contador;
+
 }
+bool aplicar_reglas(bool celulaActual, int vecinosVivos)
+{
+	if (celulaActual && vecinosVivos > 3)
+	{
+		return false;
+	}
+	if (celulaActual && vecinosVivos <2 )
+	{
+		return false;
+	}
+	if (!celulaActual && vecinosVivos == 3)
+	{
+		return true;
+	}
 
-// 🔹 Función para contar vecinos vivos
-int calcular_vecinos_vivos(const vector<vector<int>>& tablero, int fila, int columna, int tamano) {
-    int vecinos = 0;
-    int dx[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
-    int dy[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
-
-    for (int i = 0; i < 8; i++) {
-        int nx = fila + dx[i], ny = columna + dy[i];
-        if (nx >= 0 && nx < tamano && ny >= 0 && ny < tamano) {
-            vecinos += tablero[nx][ny];
-        }
-    }
-    return vecinos;
+	return celulaActual;
+	
 }
+void calcular_siguientes_generaciones(bool matrizActual[filas][columnas], bool matrizSiguiente[filas][columnas])
+{
+	for (int i = 0; i < filas; i++)
+	{
+		for (int j = 0; j < columnas; j++)
+		{
+			///cuenta los vecinos que hay alrededor 
+			int vecinosContados = contar_vecinos(matrizActual, i, j);
+			matrizSiguiente[i][j] = aplicar_reglas(matrizActual[i][j], vecinosContados);
+		}
 
-// 🔹 Función para actualizar el tablero según las reglas del juego
-void actualizar_tablero(vector<vector<int>>& tablero, int tamano) {
-    vector<vector<int>> nuevo_tablero = tablero;
-
-    for (int i = 0; i < tamano; i++) {
-        for (int j = 0; j < tamano; j++) {
-            int vecinos = calcular_vecinos_vivos(tablero, i, j, tamano);
-            if (tablero[i][j] == 1) {
-                // 🔹 Muere por subpoblación o sobrepoblación
-                if (vecinos < 2 || vecinos > 3) {
-                    nuevo_tablero[i][j] = 0;
-                }
-            }
-            else {
-                // 🔹 Nace una célula por reproducción
-                if (vecinos == 3) {
-                    nuevo_tablero[i][j] = 1;
-                }
-            }
-        }
-    }
-    tablero = nuevo_tablero;
+	}
 }
+void copiar_matriz(bool matrizActual[filas][columnas], bool matrizSiguiente[filas][columnas])
+{
 
-// 🔹 Función para imprimir el tablero
-void imprimir_tablero(const vector<vector<int>>& tablero, int tamano) {
-    for (int i = 0; i < tamano; i++) {
-        for (int j = 0; j < tamano; j++) {
-            cout << (tablero[i][j] ? "■ " : "  ");
-        }
-        cout << endl;
-    }
+	for (int i = 0; i < filas; i++)
+	{
+		for (int j = 0; j < columnas; j++)
+		{
+			matrizActual[i][j] = matrizSiguiente[i][j];
+		}
+
+	}
+}
+int main()
+{
+	srand(time(nullptr));
+	bool matrizActual[filas][columnas]; 
+	bool matrizSiguiente[filas][columnas];
+
+	inicializar_matriz(matrizActual);
+
+	matrizActual[0][0] = false;
+	matrizActual[0][1] = false;
+	matrizActual[0][2] = false;
+
+	matrizActual[1][0] = true;
+	matrizActual[1][1] = true;
+	matrizActual[1][2] = true;
+
+	matrizActual[2][0] = false;
+	matrizActual[2][1] = false;
+	matrizActual[2][2] = false;
+
+
+	
+	limpiar_pantalla();
+
+	while (true)
+	{
+		imprimir_matriz(matrizActual);
+		calcular_siguientes_generaciones(matrizActual, matrizSiguiente);
+		copiar_matriz(matrizActual, matrizSiguiente);
+		esperar(100);
+	}
+
+	return 0;
 }
